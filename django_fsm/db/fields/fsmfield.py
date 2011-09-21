@@ -118,6 +118,7 @@ def transition(field=None, source='*', target=None, save=False, conditions=[]):
                 meta = func._django_fsm
                 if not (meta.has_transition(instance) and  meta.conditions_met(instance)):
                     raise TransitionNotAllowed("Can't switch from state '%s' using method '%s'" % (meta.current_state(instance), func.func_name))
+                fieldname = field or meta._get_state_field(instance).name
 
                 source_state = meta.current_state(instance)
                 pre_transition.send(
@@ -125,6 +126,7 @@ def transition(field=None, source='*', target=None, save=False, conditions=[]):
                     instance = instance,
                     name = func.func_name,
                     source = source_state,
+                    field = fieldname,
                     target = meta.next_state(instance))
  	
                 result = func(instance, *args, **kwargs)
@@ -138,6 +140,7 @@ def transition(field=None, source='*', target=None, save=False, conditions=[]):
                     instance = instance,
                     name = func.func_name,
                     source = source_state,
+                    field = fieldname,
                     target = meta.current_state(instance))
                 return result
         else:
