@@ -14,8 +14,11 @@ class Audit(models.Model):
     created_at = models.DateTimeField(auto_now_add=True,
             help_text='Date and time of state change')
 
-    field = models.CharField(max_length=32,
+    field = models.CharField(max_length=64,
             verbose_name='Model field')
+
+    name = models.CharFileD(max_length=64,
+            verbose_name='Function name')
 
     source = models.CharField(max_length=50,
             verbose_name='Previous state')
@@ -33,13 +36,11 @@ class Audit(models.Model):
         return "Audit(%s, '%s' => '%s')" \
                 % (repr(self.content_object), self.source, self.target)
 
-
-
 @receiver(signals.post_transition)
 def log_transition(sender, **kwargs):
     """
     The signal handler, `log_transition`, creates an audit log
-    entry when on `post_transition`.
+    entry on `post_transition`.
 
     This allow us to keep an audit trail for state changes.
     """
@@ -47,10 +48,12 @@ def log_transition(sender, **kwargs):
     source = kwargs['source']
     target = kwargs['target']
     field = kwargs['field']
+    name = kwargs['name']
     
     audit = Audit(field=field,
             source=source,
             target=target,
+            name=name,
             content_object=instance)
 
     if hasattr(instance, '_django_fsm_audits'):
