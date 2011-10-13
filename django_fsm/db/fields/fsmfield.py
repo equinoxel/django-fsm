@@ -9,6 +9,9 @@ from functools import wraps
 from django.db import models
 from django.utils.functional import curry
 from django_fsm.signals import pre_transition, post_transition
+from django_fsm.models import Audit, AuditManager
+
+from django.contrib.contenttypes.models import ContentType
 
 # South support; see http://south.aeracode.org/docs/tutorial/part4.html#simple-inheritance
 try:
@@ -146,6 +149,11 @@ def transition(field=None, source='*', target=None, save=False, conditions=[]):
                     source = source_state,
                     field = fieldname,
                     target = meta.current_state(instance))
+                
+                if save and hasattr(instance, '_django_fsm_audits'):
+                    # The audit logs are created during `post_transition`
+                    for audit in instance._django_fsm_audits:
+                        audit.save()
                 return result
         else:
             _change_state = func
@@ -202,6 +210,21 @@ class FSMFieldDescriptor(object):
         instance.__dict__[self.field.name] = self.field.to_python(value)
 
 
+class FSMAuditDescriptor(object):
+    def __init__(self, model, field):
+        self.model = model
+        self.field = field
+    
+    def __get__(self, instance, instance_type=None):
+        if instance is None:
+            return self
+
+        return AuditManager(instance, self.model, self.field)
+
+    def __set__(self, instance, value):
+        raise AttributeError("Manager cannot be re-set")
+
+
 class FSMField(models.Field):
     """
     State Machine support for Django model
@@ -220,6 +243,8 @@ class FSMField(models.Field):
         setattr(cls, self.name, self.descriptor_class(self))
         if self.transitions:
             setattr(cls, 'get_available_%s_transitions' % self.name, curry(get_available_FIELD_transitions, field=self))
+        
+        setattr(cls, '%s_audits' % self.name, FSMAuditDescriptor(cls, self.name))
 
     def get_internal_type(self):
         return 'CharField'
