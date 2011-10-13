@@ -17,7 +17,7 @@ class Audit(models.Model):
     field = models.CharField(max_length=64,
             verbose_name='Model field')
 
-    name = models.CharFileD(max_length=64,
+    name = models.CharField(max_length=64,
             verbose_name='Function name')
 
     source = models.CharField(max_length=50,
@@ -30,11 +30,41 @@ class Audit(models.Model):
     object_id = models.PositiveIntegerField()
     
     content_object = generic.GenericForeignKey('content_type', 'object_id')
+    
+    @property
+    def qualified_field(self):
+        return "%s.%s" % (self.content_type, self.field)
 
+    def __unicode__(self):
+        return u"%s.%s '%s' => '%s'" % (
+                self.content_type,
+                self.field,
+                self.source,
+                self.target)
 
     def __repr__(self):
         return "Audit(%s, '%s' => '%s')" \
                 % (repr(self.content_object), self.source, self.target)
+
+class AuditManager(models.Manager):
+    """
+    The `AuditManager` provides a manager than can be limited to a
+    particular ContentType and field.
+    """
+    def __init__(self, instance, cls, field, *args, **kwargs):
+        self._cls = cls
+        self._field = field
+        self._instance = instance
+        super(AuditManager, self).__init__(*args, **kwargs)
+        
+        self.model = Audit
+
+    def get_query_set(self):
+        content_type = ContentType.objects.get_for_model(self._cls)
+        return super(AuditManager, self).get_query_set().filter(content_type__pk=content_type.id,
+                field=self._field,
+                object_id=self._instance.id)
+
 
 @receiver(signals.post_transition)
 def log_transition(sender, **kwargs):
