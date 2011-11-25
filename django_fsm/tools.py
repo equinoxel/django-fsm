@@ -6,6 +6,8 @@ Created on 18/11/2011
 
 @author: laur
 """
+from itertools import chain
+
 from django_fsm.db.fields.fsmfield import all_states
 
 def write_png_graph(fname):
@@ -19,27 +21,29 @@ def write_png_graph(fname):
     except:
         return
 
-    # Browse all tuples
-    #
-    nodes = {}
     graph = pydot.Dot(graph_type='digraph')
-    uniq = []
-    for src, dest in all_states:
-        if src and not nodes.has_key(src):
-            nodes[src] = pydot.Node(src, shape = "rect")
-            graph.add_node(nodes[src])
-        if dest and not nodes.has_key(dest):
-            nodes[dest] = pydot.Node(dest, shape = "rect")
-            graph.add_node(nodes[dest])
 
-        # Add the connection between the two nodes
-        #
-        if not src or not dest:
-            continue
-        t = "__%s__:__%s__" % (src, dest)
-        if t in uniq:
-            continue
-        uniq.append(t)
-        graph.add_edge(pydot.Edge(nodes[src], nodes[dest]))
+    # get all states
+    src, dst = zip(*all_states)
+    states = filter(lambda s: s and s != '*', list(set(chain(src, dst))))
+
+    # create all nodes
+    nodes = {}
+    for state in states:
+        nodes[state] = pydot.Node(state, shape="rect")
+        graph.add_node(nodes[state])
+
+    # create all edges
+    edges = []
+    for src, dst in all_states:
+        if src == '*':
+            sources = states
+        else:
+            sources = [src]
+        for src in sources:
+            edge = (nodes[src], nodes[dst])
+            if edge not in edges:
+                edges.append(edge)
+                graph.add_edge(pydot.Edge(edge))
 
     graph.write_png(fname)
